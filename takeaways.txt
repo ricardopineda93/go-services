@@ -1,0 +1,39 @@
+The Go-Kit implementation is a game of layers. 
+
+Transports define the method by which the services will receive messages from the outside world.
+
+Endpoints receive the messages from the Transport Layer and begin to expose the Service's
+mechanisms for servicing that request (e.g. the same way a Controller handler does).
+Very high-level, safe "unpacking" the request and invoking the Service methods accordingly.
+
+The Service itself may have it's own interfaces with their own methods that it relies upon to implement
+the methods it will expose to the endpoint. For example, the Service we defined in this example 
+exposes two high level Methods that are implemented using the underlying service struct's methods
+(e.g. the repository property is an interface with it's own methods that are implemented and relied upon
+to actually do the work for Getting/Creating the user from the DB.)
+
+It's a game of delegating down responsibilities and functionalities into disparate components,
+such that the inner-layers have to worry about less and less and parts can be swapped out 
+without breaking anything so long as the functionalities of the replaced component behave as expected.
+
+The service methods don't need to worry about anything related to gRPC or HTTP or anything related to the
+Transport -- that's been handled by a separate layer (Transport && Endpoint) such that by the time it is 
+time to do the work, it doesn't need to worry about any of that context -- just do the work and send the 
+output right back up to be repackaged just as it was unpacked for it. 
+
+By the same coin, in the example of the service struct's repository property, we can swap that out with
+a MongoDB or MySQL DB implementation and the service would be none the wiser because all of that would be contained by
+the Repository interface so long as the output and expected behavior is the same. 
+
+It's really cool to see how although this is complex, it's a construct of simplifying as we go deeper down
+and design around scalability and modularity, kind of like Legos where we can easily 
+replace some technologies entirely with good design. It's a very top down approach
+where we make sure we create/design the software in a manner where tasks/responsibilities 
+are handled entirely by an interface. In this example, our service has no idea it uses Postgres in the service code, 
+it allows the implementation of the Repository interface to handle all of that -- the Service simply serves to orchastrate
+the efforts within it's constituants to accomplish the business logic. 
+
+High level calls trickle down bit by bit into increasingly more specific implementations 
+down to where things actually get done, but abstracted away in such a way that there are
+several layers down so that there is enough control planes to handle "Layer-specific"
+functionalities, e.g. Transport handles the way HTTP is received/sent back
