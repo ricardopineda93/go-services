@@ -14,7 +14,8 @@ import (
 // basically a controller function that relies on other methods/functions to carry out the operation
 // as a whole while it just provides context, control and order.
 type Service interface {
-	CreateUser(ctx context.Context, email string, password string) (string, error)
+	CreateUserAccount(ctx context.Context, username string, password string) (string, error)
+	CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error
 	GetUser(ctx context.Context, id string) (User, error)
 }
 
@@ -48,28 +49,50 @@ of the work. Cool idea.
 // Even though the Service's underlying value/type is pointer to service struct,
 // we can still use the value receiver type. However, this means this method is operating on
 // a COPY of the service struct rather than the "actual" underlying service struct
-func (s service) CreateUser(ctx context.Context, email string, password string) (string, error) {
-	logger := log.With(s.logger, "method", "CreateUser")
+func (s service) CreateUserAccount(ctx context.Context, username string, password string) (string, error) {
+	logger := log.With(s.logger, "method", "CreateUserAccount")
 
 	uuid, _ := uuid.NewV4()
 	id := uuid.String()
-	user := User{
+	user := Account{
 		ID:       id,
-		Email:    email,
+		Username: username,
 		Password: password,
 	}
 
 	// Use the respository interface's implementation of create user to actually do
 	// the portion of the business logic, this implementation just abstracts that away
 	// and provides context and orchastration.. very neat.
-	if err := s.repository.CreateUser(ctx, user); err != nil {
+	if err := s.repository.CreateUserAccount(ctx, user); err != nil {
 		level.Error(logger).Log("err", err)
 		return "", err
 	}
 
-	logger.Log("create user", id)
+	logger.Log("create user account", id)
 
-	return "Success!", nil
+	return id, nil
+
+}
+
+func (s service) CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error {
+	logger := log.With(s.logger, "method", "CreateUserProfile")
+
+	profile := Profile{
+		AccountID: userID,
+		FirstName: firstName,
+		LastName:  lastName,
+		Email:     email,
+		Phone:     phone,
+	}
+
+	if err := s.repository.CreateUserProfile(ctx, profile); err != nil {
+		level.Error(logger).Log("err", err)
+		return err
+	}
+
+	logger.Log("create user profile", userID)
+
+	return nil
 
 }
 

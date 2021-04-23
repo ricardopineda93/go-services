@@ -30,9 +30,11 @@ func MakeEndpoints(s Service) Endpoints {
 // method of creating a User
 func makeCreateUserEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(CreateUserRequest)                    // Assert that the underlying type of the interface we received is of CreateUserRequest, and if it is extract the value
-		ok, err := s.CreateUser(ctx, req.Email, req.Password) // Call the service method
-		return CreateUserResponse{Ok: ok}, err                // Return a response in the shape we specified in this struct
+		req := request.(CreateUserRequest)                                              // Assert that the underlying type of the interface we received is of CreateUserRequest, and if it is extract the value
+		id, err := s.CreateUserAccount(ctx, req.Username, req.Password)                 // Call the service method
+		s.CreateUserProfile(ctx, id, req.FirstName, req.LastName, req.Email, req.Phone) // Call service method to create profile info for the user
+		// TODO: Error handling to delete the user account if the user profile is unable to be made
+		return CreateUserResponse{Id: id}, err // Return a response in the shape we specified in this struct
 	}
 }
 
@@ -40,6 +42,6 @@ func makeGetUserEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(GetUserRequest)
 		user, err := s.GetUser(ctx, req.Id)
-		return GetUserResponse{User: user, Err: err}, err
+		return GetUserResponse(user), err
 	}
 }

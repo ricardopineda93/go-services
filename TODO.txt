@@ -1,0 +1,6 @@
+- Authentication and Authorization (JWT), perhaps a different service all together
+- API keys
+- Validation
+- PUT, DELETE, etc for Accounts and Profiles
+- More endpoints for requesting specific types of information about the user e.g. query params
+- A user_preferences table (or field as a JSON object on user profile) to denote the user's settings

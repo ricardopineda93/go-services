@@ -4,19 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/go-kit/kit/log"
 )
 
 // A custom error we can pass back in place of the SQL error in the event
 // that our DB functions return any failures.
-var RepoErr = errors.New("Unable to handle Repo Request")
+var RepoErr = errors.New("repository error")
 
 // Exposes similar methods to the Service interface, but these will specifically
 // help us deal with the DB whereas the Service interface is the methods we expose
 // for the service as a whole.
 type Repository interface {
-	CreateUser(ctx context.Context, user User) error
+	CreateUserAccount(ctx context.Context, account Account) error
+	CreateUserProfile(ctx context.Context, profile Profile) error
 	GetUser(ctx context.Context, id string) (User, error)
 }
 
@@ -44,18 +46,40 @@ func NewRepo(db *sql.DB, logger log.Logger) Repository {
 // Repository interface to use.
 // This is using a pointer receiver type so this method can mutate the parent
 // repo struct directly if it wanted to...
-func (repo *repo) CreateUser(ctx context.Context, user User) error {
+func (repo *repo) CreateUserAccount(ctx context.Context, account Account) error {
 	sqlCmd := `
-		INSERT INTO users (id, email, password)
+		INSERT INTO user_accounts (id, username, password)
 		VALUES ($1, $2, $3)`
 
-	if user.Email == "" || user.Password == "" {
-		return RepoErr
+	// TODO: Add new tables for things like user details for the user's name, etc
+
+	// Validation framework?
+	if account.Username == "" || account.Password == "" {
+		return errors.New("username and password are required")
 	}
 
-	_, err := repo.db.ExecContext(ctx, sqlCmd, user.ID, user.Email, user.Password)
+	_, err := repo.db.ExecContext(ctx, sqlCmd, account.ID, account.Username, account.Password)
 	if err != nil {
-		return err
+		return errors.New("error saving user account")
+	}
+	return nil
+}
+
+func (repo *repo) CreateUserProfile(ctx context.Context, profile Profile) error {
+	sqlCmd := `
+		INSERT INTO user_profiles (account_id, first_name, last_name, email, phone)
+		VALUES ($1, $2, $3, $4, $5)`
+
+	// TODO: Add new tables for things like user details for the user's name, etc
+
+	// Validation framework?
+	if profile.FirstName == "" || profile.LastName == "" {
+		return errors.New("first name and last name are required")
+	}
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, profile.AccountID, profile.FirstName, profile.LastName, profile.Email, profile.Phone)
+	if err != nil {
+		return errors.New("error saving user account")
 	}
 	return nil
 }
@@ -64,9 +88,23 @@ func (repo *repo) CreateUser(ctx context.Context, user User) error {
 // Repository interface to use
 func (repo *repo) GetUser(ctx context.Context, id string) (User, error) {
 	var user User
-	err := repo.db.QueryRow("SELECT id, email FROM users WHERE id=$1", id).Scan(&user.ID, &user.Email)
+	err := repo.db.QueryRow(`
+	SELECT acct.id, acct.username, acct.joined_on, prof.first_name,prof.last_name, prof.email, prof.phone, prof.last_login
+	FROM user_accounts AS acct
+	INNER JOIN user_profiles as prof
+	ON acct.id = prof.account_id
+	WHERE id=$1`,
+		id).Scan(&user.Account.ID, &user.Account.Username, &user.Account.JoinedOn, &user.Profile.FirstName, &user.Profile.LastName, &user.Profile.Email, &user.Profile.Phone, &user.Profile.LastLogin)
 	if err != nil {
-		return user, RepoErr
+		fmt.Println(err)
+		return user, errors.New("no user found")
 	}
 	return user, nil
 }
+
+// TODO: I should have a wrapper function over fields/values that could potentially be NULL
+// from the SQL query that can then convert to the receiver's datatype's zero-value OR
+// omit that from the response entirely.
+
+// This should be handled here so as to not taint any of the other code with DB
+// related workarounds or anything like that.

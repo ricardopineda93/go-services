@@ -12,19 +12,23 @@ import (
 // decode/encode to these respective shapes
 type (
 	CreateUserRequest struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Email     string `json:"email,omitempty"`
+		Phone     string `json:"phone,omitempty"`
 	}
 	CreateUserResponse struct {
-		Ok string `json:"ok"`
+		Id string `json:"id"`
 	}
 
 	GetUserRequest struct {
 		Id string `json:"id"`
 	}
 	GetUserResponse struct {
-		User User  `json:"user"`
-		Err  error `json:"err,omitempty"`
+		Account Account `json:"user_account"`
+		Profile Profile `json:"user_profile"`
 	}
 )
 
