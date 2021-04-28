@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
+	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 // A custom error we can pass back in place of the SQL error in the event
@@ -17,9 +18,13 @@ var RepoErr = errors.New("repository error")
 // help us deal with the DB whereas the Service interface is the methods we expose
 // for the service as a whole.
 type Repository interface {
-	CreateUserAccount(ctx context.Context, account Account) error
-	CreateUserProfile(ctx context.Context, profile Profile) error
-	GetUser(ctx context.Context, id string) (User, error)
+	CreateUserAccount(ctx context.Context, account u.Account) error
+	DeleteUserAccount(ctx context.Context, id string) error
+	CreateUserProfile(ctx context.Context, profile u.Profile) error
+	GetUserProfile(ctx context.Context, accountID string) (u.Profile, error)
+	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
+	GetUserAccount(ctx context.Context, id string) (u.Account, error)
+	GetAccountByLoginCredentials(ctx context.Context, username string, password string) (u.Account, error)
 }
 
 // Defining a struct we will create methods for to implement the Repository interface
@@ -46,7 +51,7 @@ func NewRepo(db *sql.DB, logger log.Logger) Repository {
 // Repository interface to use.
 // This is using a pointer receiver type so this method can mutate the parent
 // repo struct directly if it wanted to...
-func (repo *repo) CreateUserAccount(ctx context.Context, account Account) error {
+func (repo *repo) CreateUserAccount(ctx context.Context, account u.Account) error {
 	sqlCmd := `
 		INSERT INTO user_accounts (id, username, password)
 		VALUES ($1, $2, $3)`
@@ -65,12 +70,20 @@ func (repo *repo) CreateUserAccount(ctx context.Context, account Account) error 
 	return nil
 }
 
-func (repo *repo) CreateUserProfile(ctx context.Context, profile Profile) error {
+func (repo *repo) DeleteUserAccount(ctx context.Context, id string) error {
+	sqlCmd := `DELETE FROM user_accounts WHERE id=$1`
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, id)
+	if err != nil {
+		return errors.New("error deleting user account")
+	}
+	return nil
+}
+
+func (repo *repo) CreateUserProfile(ctx context.Context, profile u.Profile) error {
 	sqlCmd := `
 		INSERT INTO user_profiles (account_id, first_name, last_name, email, phone)
 		VALUES ($1, $2, $3, $4, $5)`
-
-	// TODO: Add new tables for things like user details for the user's name, etc
 
 	// Validation framework?
 	if profile.FirstName == "" || profile.LastName == "" {
@@ -79,27 +92,114 @@ func (repo *repo) CreateUserProfile(ctx context.Context, profile Profile) error 
 
 	_, err := repo.db.ExecContext(ctx, sqlCmd, profile.AccountID, profile.FirstName, profile.LastName, profile.Email, profile.Phone)
 	if err != nil {
-		return errors.New("error saving user account")
+		return errors.New("error saving user profile")
+	}
+	return nil
+}
+
+func (repo *repo) GetUserProfile(ctx context.Context, accountID string) (u.Profile, error) {
+	var profile u.Profile
+
+	err := repo.db.QueryRowContext(ctx,
+		`SELECT first_name, last_name, email, phone, last_login
+	FROM user_profiles
+	WHERE account_id=$1`,
+		accountID).Scan(&profile.FirstName, &profile.LastName, &profile.Email, &profile.Phone, &profile.LastLogin)
+
+	if err != nil {
+		return profile, errors.New("error getting user profile")
+	}
+
+	return profile, nil
+}
+
+func (repo *repo) UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error {
+
+	var updateStr string = ``
+
+	fmt.Println(accountID)
+
+	keysLeft := len(updates)
+	for k, v := range updates {
+		updateStr += genUpdateLine(k, v)
+		if keysLeft -= 1; keysLeft > 0 {
+			updateStr += ","
+		}
+	}
+	sqlCmd := `UPDATE user_profiles SET ` + updateStr + `WHERE account_id = $1`
+
+	fmt.Println(sqlCmd)
+
+	_, err := repo.db.ExecContext(ctx,
+		sqlCmd,
+		accountID)
+
+	if err != nil {
+		fmt.Println(err)
+		return errors.New("unable to update user profile")
 	}
 	return nil
 }
 
 // Defining the method that will handle finding a user in the DB for the
 // Repository interface to use
-func (repo *repo) GetUser(ctx context.Context, id string) (User, error) {
-	var user User
+func (repo *repo) GetUserAccount(ctx context.Context, id string) (u.Account, error) {
+	var account u.Account
 	err := repo.db.QueryRow(`
-	SELECT acct.id, acct.username, acct.joined_on, prof.first_name,prof.last_name, prof.email, prof.phone, prof.last_login
+	SELECT acct.id, acct.username, acct.joined_on
 	FROM user_accounts AS acct
-	INNER JOIN user_profiles as prof
-	ON acct.id = prof.account_id
 	WHERE id=$1`,
-		id).Scan(&user.Account.ID, &user.Account.Username, &user.Account.JoinedOn, &user.Profile.FirstName, &user.Profile.LastName, &user.Profile.Email, &user.Profile.Phone, &user.Profile.LastLogin)
+		id).Scan(&account.ID, &account.Username, &account.JoinedOn)
 	if err != nil {
 		fmt.Println(err)
-		return user, errors.New("no user found")
+		return account, errors.New("no user found")
 	}
-	return user, nil
+	return account, nil
+}
+
+func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username string, password string) (u.Account, error) {
+	var account u.Account
+
+	// First find user account by username
+	err := repo.db.QueryRowContext(ctx,
+		`SELECT id, username, password,joined_on
+	FROM user_accounts
+	WHERE username=$1`,
+		username).Scan(&account.ID, &account.Username, &account.Password, &account.JoinedOn)
+
+	// Check to see if the user account's password matches input password
+	if err != nil {
+		fmt.Println(err)
+		return u.Account{}, errors.New("invalid credentials")
+	}
+
+	if password != account.Password {
+		return u.Account{}, errors.New("incorrect password")
+	}
+
+	return account, nil
+}
+
+func genUpdateLine(k string, v interface{}) string {
+	update := k + " = "
+
+	switch t := v.(type) {
+	case string:
+		if v == "DEFAULT" {
+			update += t
+		} else {
+			// update += fmt.Sprintf("%q", t)
+			update += "'" + t + "'"
+		}
+	case nil:
+		return ""
+	default:
+		update += fmt.Sprintf("%v", t)
+
+	}
+
+	update += " "
+	return update
 }
 
 // TODO: I should have a wrapper function over fields/values that could potentially be NULL

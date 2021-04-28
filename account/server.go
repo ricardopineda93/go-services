@@ -6,6 +6,7 @@ import (
 
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
+	user "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 /*
@@ -33,17 +34,29 @@ func NewHTTPServer(ctx context.Context, endpoints Endpoints) http.Handler {
 	// do a bit of functional programming-esque stuff where we pass in another function to handler
 	// that itself consumer ANOTHER function (the actual endpoint which is itself a function that returns a function)
 
-	router.Methods("POST").Path("/user").Handler(
+	router.Methods("POST").Path("/users").Handler(
 		httptransport.NewServer( // This "brokers" the Transport and Endpoint layers, allowing us a way to transform the request from on layer to the next
 			endpoints.CreateUser, // The endpoint itself
-			decodeUserReq,        // How we want to "decode" the request, i.e. take the HTTP request and cast it into something the Endpoint/service can use
-			encodeResponse,       // How we want to "encode" the resulting response our Endpoint returns (this case as JSON)
+			user.DecodeUserReq,   // How we want to "decode" the request, i.e. take the HTTP request and cast it into something the Endpoint/service can use
+			user.EncodeResponse,  // How we want to "encode" the resulting response our Endpoint returns (this case as JSON)
 		))
 
-	router.Methods("GET").Path("/user/{id}").Handler(httptransport.NewServer(endpoints.GetUser,
-		decodeGetUserReq,
-		encodeResponse,
+	router.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(endpoints.GetUser,
+		user.DecodeGetUserReq,
+		user.EncodeResponse,
 	))
+
+	router.Methods("PUT").Path("/users/{id}/profile").Handler(httptransport.NewServer(endpoints.UpdateUserProfile,
+		user.DecodeUpdateUserProfileReq,
+		user.EncodeResponse,
+	))
+
+	router.Methods("POST").Path("/login").Handler(
+		httptransport.NewServer(
+			endpoints.LoginUser,
+			user.DecodeLoginReq,
+			user.EncodeResponse,
+		))
 
 	return router
 }

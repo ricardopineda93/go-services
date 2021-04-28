@@ -6,6 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gofrs/uuid"
+	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 // Service interface exposes what methods are available for the service to the Endpoint Layer.
@@ -15,8 +16,11 @@ import (
 // as a whole while it just provides context, control and order.
 type Service interface {
 	CreateUserAccount(ctx context.Context, username string, password string) (string, error)
+	DeleteUserAccount(ctx context.Context, id string) error
+	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
 	CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error
-	GetUser(ctx context.Context, id string) (User, error)
+	GetUserAccount(ctx context.Context, id string) (u.Account, error)
+	Login(ctx context.Context, username string, password string) (u.DetailedUser, error)
 }
 
 // The properties the service will contain
@@ -54,7 +58,7 @@ func (s service) CreateUserAccount(ctx context.Context, username string, passwor
 
 	uuid, _ := uuid.NewV4()
 	id := uuid.String()
-	user := Account{
+	user := u.Account{
 		ID:       id,
 		Username: username,
 		Password: password,
@@ -71,13 +75,28 @@ func (s service) CreateUserAccount(ctx context.Context, username string, passwor
 	logger.Log("create user account", id)
 
 	return id, nil
+}
 
+func (s service) DeleteUserAccount(ctx context.Context, id string) error {
+	logger := log.With(s.logger, "method", "DeleteUserAccount")
+
+	// Use the respository interface's implementation of create user to actually do
+	// the portion of the business logic, this implementation just abstracts that away
+	// and provides context and orchastration.. very neat.
+	if err := s.repository.DeleteUserAccount(ctx, id); err != nil {
+		level.Error(logger).Log("err", err)
+		return err
+	}
+
+	logger.Log("deleted user account", id)
+
+	return nil
 }
 
 func (s service) CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error {
 	logger := log.With(s.logger, "method", "CreateUserProfile")
 
-	profile := Profile{
+	profile := u.Profile{
 		AccountID: userID,
 		FirstName: firstName,
 		LastName:  lastName,
@@ -97,19 +116,66 @@ func (s service) CreateUserProfile(ctx context.Context, userID string, firstName
 }
 
 // Method for service struct for the Service interface to implement
-func (s service) GetUser(ctx context.Context, id string) (User, error) {
+func (s service) GetUserAccount(ctx context.Context, id string) (u.Account, error) {
 	logger := log.With(s.logger, "method", "GetUser")
 
 	// Same thing here, using the repository property's methods to actually do the
 	// fetching while this method just is kind of a control flow method.
-	user, err := s.repository.GetUser(ctx, id)
+	account, err := s.repository.GetUserAccount(ctx, id)
 
 	if err != nil {
 		level.Error(logger).Log("err", err)
-		return user, err
+		return account, err
 	}
 
-	logger.Log("Get user", id)
+	logger.Log("Get user account", id)
 
-	return user, nil
+	return account, nil
+}
+
+func (s service) Login(ctx context.Context, username string, password string) (u.DetailedUser, error) {
+	logger := log.With(s.logger, "method", "Login")
+
+	account, err := s.repository.GetAccountByLoginCredentials(ctx, username, password)
+
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return u.DetailedUser{}, err
+	}
+
+	err = s.repository.UpdateUserProfile(ctx, account.ID, map[string]interface{}{
+		"last_login": "DEFAULT",
+	})
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return u.DetailedUser{}, err
+	}
+
+	profile, err := s.repository.GetUserProfile(ctx, account.ID)
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return u.DetailedUser{}, err
+	}
+
+	logger.Log("Login user", account.ID)
+
+	return u.DetailedUser{
+		Account: account,
+		Profile: profile,
+	}, nil
+}
+
+func (s service) UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error {
+	logger := log.With(s.logger, "method", "UpdateUserProfile")
+
+	err := s.repository.UpdateUserProfile(ctx, accountID, updates)
+
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return err
+	}
+
+	logger.Log("updated user profile", accountID)
+
+	return nil
 }
