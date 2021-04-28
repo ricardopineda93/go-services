@@ -1,38 +1,34 @@
 package account
 
 type Account struct {
-	ID       string `json:"id"`
-	Name     string `json:"org_name"`
-	Type     string `json:"org_type"`
-	JoinedOn string `json:"joined_on"`
+	ID       string `db:"id"`
+	Name     string `db:"name"`
+	Type     string `db:"type"`
+	JoinedOn string `db:"joined_on"`
 }
 
 type Profile struct {
-	AccountID string `json:"account_id"`
-	Website   string `json:"website"`
-	Phone     string `json:"phone"`
-	Timezone  string `json:"timezone"`
-	Address   struct {
-		Street string `json:"street"`
-		City   string `json:"city"`
-		State  string `json:"state"`
-		Zip    string `json:"zip"`
-	} `json:"address"`
-	PrimaryContact struct {
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Phone     string `json:"phone"`
-		Email     string `json:"email"`
-	} `json:"primary_contact"`
+	AccountID string `db:"account_id"`
+	Phone     string `db:"phone"`
+	Address   string `db:"address"`
+	Timezone  string `db:"timezone"`
+	Website   string `db:"website"`
 }
 
 type ProviderDetails struct {
-	AccountID string `json:"account_id"`
-	NPI       string `json:"npi"`
-	TaxID     string `json:"tax_id"`
+	AccountID string `db:"account_id"`
+	NPI       string `db:"npi"`
+	TaxID     string `db:"tax_id"`
 }
 
 type PayorDetails struct {
-	AccountID string `json:"account_id"`
-	PayorID   string `json:"payor_id"`
+	AccountID string `db:"account_id"`
+	PayorID   string `db:"payor_id"`
+}
+
+type DetailedOrg struct {
+	Account         Account
+	Profile         Profile
+	ProviderDetails ProviderDetails
+	PayorDetails    PayorDetails
 }

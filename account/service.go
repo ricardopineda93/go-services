@@ -6,6 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gofrs/uuid"
+	o "github.com/rjjp5294/gokit-tutorial/account/organization"
 	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
@@ -15,12 +16,13 @@ import (
 // basically a controller function that relies on other methods/functions to carry out the operation
 // as a whole while it just provides context, control and order.
 type Service interface {
-	CreateUserAccount(ctx context.Context, username string, password string) (string, error)
+	CreateUser(ctx context.Context, orgID string, username string, password string, orgType string, firstName string, lastName string, email string, phone string) (string, error)
 	DeleteUserAccount(ctx context.Context, id string) error
 	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
-	CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error
 	GetUserAccount(ctx context.Context, id string) (u.Account, error)
-	Login(ctx context.Context, username string, password string) (u.DetailedUser, error)
+	Login(ctx context.Context, orgID string, username string, password string) (u.DetailedUser, error)
+
+	CreateOrg(ctx context.Context, name string, orgType string, phone string, address string, timezone string, website string) (string, error)
 }
 
 // The properties the service will contain
@@ -53,8 +55,8 @@ of the work. Cool idea.
 // Even though the Service's underlying value/type is pointer to service struct,
 // we can still use the value receiver type. However, this means this method is operating on
 // a COPY of the service struct rather than the "actual" underlying service struct
-func (s service) CreateUserAccount(ctx context.Context, username string, password string) (string, error) {
-	logger := log.With(s.logger, "method", "CreateUserAccount")
+func (s service) CreateUser(ctx context.Context, orgID string, username string, password string, orgType string, firstName string, lastName string, email string, phone string) (string, error) {
+	logger := log.With(s.logger, "method", "CreateUser")
 
 	uuid, _ := uuid.NewV4()
 	id := uuid.String()
@@ -62,6 +64,7 @@ func (s service) CreateUserAccount(ctx context.Context, username string, passwor
 		ID:       id,
 		Username: username,
 		Password: password,
+		OrgType:  orgType,
 	}
 
 	// Use the respository interface's implementation of create user to actually do
@@ -72,7 +75,28 @@ func (s service) CreateUserAccount(ctx context.Context, username string, passwor
 		return "", err
 	}
 
-	logger.Log("create user account", id)
+	profile := u.Profile{
+		AccountID: id,
+		FirstName: firstName,
+		LastName:  lastName,
+		Email:     email,
+		Phone:     phone,
+	}
+
+	if err := s.repository.CreateUserProfile(ctx, profile); err != nil {
+		s.repository.DeleteUserAccount(ctx, id)
+		level.Error(logger).Log("err", err)
+		return "", err
+	}
+
+	// TODO: Create Association of User and Organization
+	if err := s.repository.AssociateUserToOrg(ctx, id, orgID); err != nil {
+		s.repository.DeleteUserAccount(ctx, id)
+		level.Error(logger).Log("err", err)
+		return "", err
+	}
+
+	logger.Log("created user", id)
 
 	return id, nil
 }
@@ -93,28 +117,6 @@ func (s service) DeleteUserAccount(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s service) CreateUserProfile(ctx context.Context, userID string, firstName string, lastName string, email string, phone string) error {
-	logger := log.With(s.logger, "method", "CreateUserProfile")
-
-	profile := u.Profile{
-		AccountID: userID,
-		FirstName: firstName,
-		LastName:  lastName,
-		Email:     email,
-		Phone:     phone,
-	}
-
-	if err := s.repository.CreateUserProfile(ctx, profile); err != nil {
-		level.Error(logger).Log("err", err)
-		return err
-	}
-
-	logger.Log("create user profile", userID)
-
-	return nil
-
-}
-
 // Method for service struct for the Service interface to implement
 func (s service) GetUserAccount(ctx context.Context, id string) (u.Account, error) {
 	logger := log.With(s.logger, "method", "GetUser")
@@ -133,7 +135,7 @@ func (s service) GetUserAccount(ctx context.Context, id string) (u.Account, erro
 	return account, nil
 }
 
-func (s service) Login(ctx context.Context, username string, password string) (u.DetailedUser, error) {
+func (s service) Login(ctx context.Context, orgID string, username string, password string) (u.DetailedUser, error) {
 	logger := log.With(s.logger, "method", "Login")
 
 	account, err := s.repository.GetAccountByLoginCredentials(ctx, username, password)
@@ -143,10 +145,14 @@ func (s service) Login(ctx context.Context, username string, password string) (u
 		return u.DetailedUser{}, err
 	}
 
-	err = s.repository.UpdateUserProfile(ctx, account.ID, map[string]interface{}{
+	if err := s.repository.ConfirmUserToOrgAssociation(ctx, account.ID, orgID); err != nil {
+		level.Error(logger).Log("err", err)
+		return u.DetailedUser{}, err
+	}
+
+	if err := s.repository.UpdateUserProfile(ctx, account.ID, map[string]interface{}{
 		"last_login": "DEFAULT",
-	})
-	if err != nil {
+	}); err != nil {
 		level.Error(logger).Log("err", err)
 		return u.DetailedUser{}, err
 	}
@@ -171,11 +177,49 @@ func (s service) UpdateUserProfile(ctx context.Context, accountID string, update
 	err := s.repository.UpdateUserProfile(ctx, accountID, updates)
 
 	if err != nil {
-		level.Error(logger).Log("err", err)
 		return err
 	}
 
 	logger.Log("updated user profile", accountID)
 
 	return nil
+}
+
+func (s service) CreateOrg(ctx context.Context, name string, orgType string, phone string, address string, timezone string, website string) (string, error) {
+	logger := log.With(s.logger, "method", "CreateOrg")
+
+	uuid, _ := uuid.NewV4()
+	id := uuid.String()
+
+	orgAccount := o.Account{
+		ID:   id,
+		Name: name,
+		Type: orgType,
+	}
+
+	err := s.repository.CreateOrgAccount(ctx, orgAccount)
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return "", err
+	}
+
+	orgProfile := o.Profile{
+		AccountID: id,
+		Phone:     phone,
+		Address:   address,
+		Timezone:  timezone,
+		Website:   website,
+	}
+
+	err = s.repository.CreateOrgProfile(ctx, orgProfile)
+
+	if err != nil {
+		s.repository.DeleteOrgAccount(ctx, id)
+		level.Error(logger).Log("err", err)
+		return "", err
+	}
+
+	logger.Log("created organization", id)
+
+	return id, nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
+	o "github.com/rjjp5294/gokit-tutorial/account/organization"
 	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
@@ -25,6 +26,13 @@ type Repository interface {
 	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
 	GetUserAccount(ctx context.Context, id string) (u.Account, error)
 	GetAccountByLoginCredentials(ctx context.Context, username string, password string) (u.Account, error)
+
+	CreateOrgAccount(ctx context.Context, orgAccount o.Account) error
+	CreateOrgProfile(ctx context.Context, orgProfile o.Profile) error
+	DeleteOrgAccount(ctx context.Context, id string) error
+
+	AssociateUserToOrg(ctx context.Context, userID string, orgID string) error
+	ConfirmUserToOrgAssociation(ctx context.Context, userID string, orgID string) error
 }
 
 // Defining a struct we will create methods for to implement the Repository interface
@@ -53,8 +61,8 @@ func NewRepo(db *sql.DB, logger log.Logger) Repository {
 // repo struct directly if it wanted to...
 func (repo *repo) CreateUserAccount(ctx context.Context, account u.Account) error {
 	sqlCmd := `
-		INSERT INTO user_accounts (id, username, password)
-		VALUES ($1, $2, $3)`
+		INSERT INTO user_accounts (id, username, password, org_type)
+		VALUES ($1, $2, $3, $4)`
 
 	// TODO: Add new tables for things like user details for the user's name, etc
 
@@ -63,7 +71,7 @@ func (repo *repo) CreateUserAccount(ctx context.Context, account u.Account) erro
 		return errors.New("username and password are required")
 	}
 
-	_, err := repo.db.ExecContext(ctx, sqlCmd, account.ID, account.Username, account.Password)
+	_, err := repo.db.ExecContext(ctx, sqlCmd, account.ID, account.Username, account.Password, account.OrgType)
 	if err != nil {
 		return errors.New("error saving user account")
 	}
@@ -115,27 +123,15 @@ func (repo *repo) GetUserProfile(ctx context.Context, accountID string) (u.Profi
 
 func (repo *repo) UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error {
 
-	var updateStr string = ``
+	var updateStr string = createUpdateStringFromMap(updates)
 
-	fmt.Println(accountID)
-
-	keysLeft := len(updates)
-	for k, v := range updates {
-		updateStr += genUpdateLine(k, v)
-		if keysLeft -= 1; keysLeft > 0 {
-			updateStr += ","
-		}
-	}
 	sqlCmd := `UPDATE user_profiles SET ` + updateStr + `WHERE account_id = $1`
-
-	fmt.Println(sqlCmd)
 
 	_, err := repo.db.ExecContext(ctx,
 		sqlCmd,
 		accountID)
 
 	if err != nil {
-		fmt.Println(err)
 		return errors.New("unable to update user profile")
 	}
 	return nil
@@ -178,6 +174,86 @@ func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username str
 	}
 
 	return account, nil
+}
+
+func (repo *repo) CreateOrgAccount(ctx context.Context, orgAccount o.Account) error {
+	sqlCmd := `
+		INSERT INTO org_accounts (id, name, type)
+		VALUES ($1, $2, $3)`
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, orgAccount.ID, orgAccount.Name, orgAccount.Type)
+	if err != nil {
+		fmt.Println(err)
+		return errors.New("error saving organization account")
+	}
+	return nil
+}
+
+func (repo *repo) CreateOrgProfile(ctx context.Context, orgProfile o.Profile) error {
+	sqlCmd := `
+	INSERT INTO org_profiles (account_id, address, phone, timezone, website)
+	VALUES ($1, $2, $3, $4, $5)`
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, orgProfile.AccountID, orgProfile.Address, orgProfile.Phone, orgProfile.Timezone, orgProfile.Website)
+
+	if err != nil {
+		fmt.Println(err)
+		return errors.New("error saving organization profile")
+	}
+	return nil
+}
+
+func (repo *repo) DeleteOrgAccount(ctx context.Context, id string) error {
+	sqlCmd := `DELETE FROM org_accounts WHERE id=$1`
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, id)
+	if err != nil {
+		return errors.New("error deleting organization account")
+	}
+	return nil
+}
+
+func (repo *repo) AssociateUserToOrg(ctx context.Context, userID string, orgID string) error {
+	sqlCmd := `INSERT INTO org_users (user_id, org_id) VALUES ($1, $2)`
+
+	_, err := repo.db.ExecContext(ctx, sqlCmd, userID, orgID)
+
+	if err != nil {
+		return errors.New("error associating user to organization")
+	}
+	return nil
+}
+
+func (repo *repo) ConfirmUserToOrgAssociation(ctx context.Context, userID string, orgID string) error {
+	sqlCmd := `SELECT COUNT(id) FROM org_users WHERE user_id = $1 AND org_id = $2`
+
+	var count int
+
+	err := repo.db.QueryRowContext(ctx, sqlCmd, userID, orgID).Scan(&count)
+
+	if err != nil {
+		return errors.New("error confirming user association to organization")
+	}
+
+	if count == 0 {
+		return errors.New("user not associated to organization")
+	}
+
+	return nil
+}
+
+func createUpdateStringFromMap(updates map[string]interface{}) string {
+	var updateStr string = ``
+
+	keysLeft := len(updates)
+	for k, v := range updates {
+		updateStr += genUpdateLine(k, v)
+		if keysLeft -= 1; keysLeft > 0 {
+			updateStr += ","
+		}
+	}
+
+	return updateStr
 }
 
 func genUpdateLine(k string, v interface{}) string {

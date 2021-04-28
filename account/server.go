@@ -6,7 +6,6 @@ import (
 
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
-	user "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 /*
@@ -29,33 +28,40 @@ func NewHTTPServer(ctx context.Context, endpoints Endpoints) http.Handler {
 	// adds the content-type:application/json header to each of our responses.
 	router.Use(commonMiddleware)
 
-	// We specifically map the POST method for the /user path to be handled the be
-	// endpoint we designate here. Instead of passing in the Endpoint directly, we instead
+	// Instead of passing in the Endpoint directly, we instead
 	// do a bit of functional programming-esque stuff where we pass in another function to handler
-	// that itself consumer ANOTHER function (the actual endpoint which is itself a function that returns a function)
+	// that itself consumes ANOTHER function (the actual endpoint which is itself a function that returns a function)
+	router.Methods("POST").Path("/login/org/{org_id}").Handler(
+		httptransport.NewServer(
+			endpoints.LoginUser,
+			DecodeLoginReq,
+			EncodeResponse,
+		))
 
-	router.Methods("POST").Path("/users").Handler(
+	// TODO: Subrouting
+
+	router.Methods("POST").Path("/users/org/{org_id}").Handler(
 		httptransport.NewServer( // This "brokers" the Transport and Endpoint layers, allowing us a way to transform the request from on layer to the next
 			endpoints.CreateUser, // The endpoint itself
-			user.DecodeUserReq,   // How we want to "decode" the request, i.e. take the HTTP request and cast it into something the Endpoint/service can use
-			user.EncodeResponse,  // How we want to "encode" the resulting response our Endpoint returns (this case as JSON)
+			DecodeCreateUserReq,  // How we want to "decode" the request, i.e. take the HTTP request and cast it into something the Endpoint/service can use
+			EncodeResponse,       // How we want to "encode" the resulting response our Endpoint returns (this case as JSON)
 		))
 
 	router.Methods("GET").Path("/users/{id}").Handler(httptransport.NewServer(endpoints.GetUser,
-		user.DecodeGetUserReq,
-		user.EncodeResponse,
+		DecodeGetUserReq,
+		EncodeResponse,
 	))
 
 	router.Methods("PUT").Path("/users/{id}/profile").Handler(httptransport.NewServer(endpoints.UpdateUserProfile,
-		user.DecodeUpdateUserProfileReq,
-		user.EncodeResponse,
+		DecodeUpdateUserProfileReq,
+		EncodeResponse,
 	))
 
-	router.Methods("POST").Path("/login").Handler(
+	router.Methods("POST").Path("/orgs").Handler(
 		httptransport.NewServer(
-			endpoints.LoginUser,
-			user.DecodeLoginReq,
-			user.EncodeResponse,
+			endpoints.CreateOrg,
+			DecodeCreateOrgReq,
+			EncodeResponse,
 		))
 
 	return router

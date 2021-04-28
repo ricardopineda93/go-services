@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/endpoint"
-	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 // These are akin to Controller Handlers, this is where we can "unpack" the requests
@@ -20,6 +19,8 @@ type Endpoints struct {
 	GetUser           endpoint.Endpoint
 	LoginUser         endpoint.Endpoint
 	UpdateUserProfile endpoint.Endpoint
+
+	CreateOrg endpoint.Endpoint
 }
 
 // Factory function that exposes this service-specific functionalities
@@ -29,6 +30,8 @@ func MakeEndpoints(s Service) Endpoints {
 		GetUser:           makeGetUserAccountEndpoint(s),
 		LoginUser:         makeLoginUserEndpoint(s),
 		UpdateUserProfile: makeUpdateUserProfileEndpoint(s),
+
+		CreateOrg: makeCreateOrgEndpoint(s),
 	}
 }
 
@@ -37,45 +40,40 @@ func MakeEndpoints(s Service) Endpoints {
 // method of creating a User
 func makeCreateUserEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(u.CreateUserRequest) // Assert that the underlying type of the interface we received is of CreateUserRequest, and if it is extract the value
+		req := request.(CreateUserRequest) // Assert that the underlying type of the interface we received is of CreateUserRequest, and if it is extract the value
 		// TODO: Have some validation somewhere that can prevent us from wasting effort
 		// if the request isn't going to be valid.
-		id, err := s.CreateUserAccount(ctx, req.Username, req.Password)
+		id, err := s.CreateUser(ctx, req.OrgID, req.Username, req.Password, req.OrgType, req.FirstName, req.LastName, req.Email, req.Phone)
 		if err != nil {
 			return nil, err
-		} // Call the service method
-		err = s.CreateUserProfile(ctx, id, req.FirstName, req.LastName, req.Email, req.Phone) // Call service method to create profile info for the user
-		if err != nil {
-			s.DeleteUserAccount(ctx, id)
 		}
-		// TODO: Error handling to delete the user account if the user profile is unable to be made
-		return u.CreateUserResponse{ID: id}, err // Return a response in the shape we specified in this struct
+		return CreateUserResponse{ID: id}, err // Return a response in the shape we specified in this struct
 	}
 }
 
 func makeGetUserAccountEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(u.GetUserRequest)
+		req := request.(GetUserRequest)
 		account, err := s.GetUserAccount(ctx, req.ID)
-		return u.GetUserAccountResponse{ID: account.ID, Username: account.Username, JoinedOn: account.JoinedOn}, err
+		return GetUserAccountResponse{ID: account.ID, Username: account.Username, JoinedOn: account.JoinedOn}, err
 	}
 }
 
 func makeLoginUserEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(u.LoginRequest)
+		req := request.(LoginRequest)
 
-		detailedUser, err := s.Login(ctx, req.Username, req.Password)
+		detailedUser, err := s.Login(ctx, req.OrgID, req.Username, req.Password)
 
 		account, profile := &detailedUser.Account, &detailedUser.Profile
 
-		return u.LoginResponse{
-			Account: u.LoginAccount{
+		return LoginResponse{
+			Account: LoginAccount{
 				ID:       account.ID,
 				Username: account.Username,
 				JoinedOn: account.JoinedOn,
 			},
-			Profile: u.LoginProfile{
+			Profile: LoginProfile{
 				FirstName: profile.FirstName,
 				LastName:  profile.LastName,
 				Email:     profile.Email,
@@ -89,10 +87,10 @@ func makeLoginUserEndpoint(s Service) endpoint.Endpoint {
 
 func makeUpdateUserProfileEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(u.UpdateProfileRequest)
+		req := request.(UpdateProfileRequest)
 
 		// Unmarshall Updates struct into map based on json tags
-		updatesMap := structToMap(req.Updates)
+		updatesMap := structToMapByTag(req.Updates, "json")
 
 		err := s.UpdateUserProfile(ctx, req.AccountID, updatesMap)
 
@@ -100,11 +98,25 @@ func makeUpdateUserProfileEndpoint(s Service) endpoint.Endpoint {
 			return nil, err
 		}
 
-		return u.UpdateProfileResponse{OK: "ok"}, nil
+		return UpdateProfileResponse{OK: "ok"}, nil
 	}
 }
 
-func structToMap(item interface{}) map[string]interface{} {
+func makeCreateOrgEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(CreateOrgRequest)
+
+		id, err := s.CreateOrg(ctx, req.Name, req.Type, req.Phone, req.Address, req.Timezone, req.Website)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return CreateOrgResponse{ID: id}, nil
+	}
+}
+
+func structToMapByTag(item interface{}, tagName string) map[string]interface{} {
 
 	res := map[string]interface{}{}
 	if item == nil {
@@ -118,7 +130,7 @@ func structToMap(item interface{}) map[string]interface{} {
 		v = v.Elem()
 	}
 	for i := 0; i < v.NumField(); i++ {
-		tag := v.Field(i).Tag.Get("json")
+		tag := v.Field(i).Tag.Get(tagName)
 
 		// remove omitEmpty
 		omitEmpty := false
@@ -135,7 +147,7 @@ func structToMap(item interface{}) map[string]interface{} {
 		field := reflectValue.Field(i).Interface()
 		if tag != "" && tag != "-" {
 			if v.Field(i).Type.Kind() == reflect.Struct {
-				res[tag] = structToMap(field)
+				res[tag] = structToMapByTag(field, tagName)
 			} else {
 				if !(omitEmpty && reflectValue.Field(i).IsZero()) {
 					res[tag] = field

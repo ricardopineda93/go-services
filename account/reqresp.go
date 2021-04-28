@@ -12,8 +12,10 @@ import (
 // decode/encode to these respective shapes
 type (
 	CreateUserRequest struct {
+		OrgID     string `json:"org_id"`
 		Username  string `json:"username"`
 		Password  string `json:"password"`
+		OrgType   string `json:"org_type"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 		Email     string `json:"email,omitempty"`
@@ -33,6 +35,7 @@ type (
 	}
 
 	LoginRequest struct {
+		OrgID    string
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
@@ -66,6 +69,18 @@ type (
 		Email     string `json:"email,omitempty"`
 		Phone     string `json:"phone,omitempty"`
 	}
+
+	CreateOrgRequest struct {
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Phone    string `json:"phone"`
+		Address  string `json:"address"`
+		Timezone string `json:"timezone"`
+		Website  string `json:"website"`
+	}
+	CreateOrgResponse struct {
+		ID string `json:"id"`
+	}
 )
 
 // This function is responsible for encoding the Response body into JSON
@@ -77,9 +92,12 @@ func EncodeResponse(ctx context.Context, respWriter http.ResponseWriter, respons
 // unmarshaled request body in the CreateUserRequest format.
 // It takes the actual HTTP Request and returns an empty interface with the underlying
 // type/value being the CreateUserRequest struct, thus "casting" it from one to the other.
-func DecodeUserReq(ctx context.Context, req *http.Request) (interface{}, error) {
+func DecodeCreateUserReq(ctx context.Context, req *http.Request) (interface{}, error) {
+	pathVars := mux.Vars(req)
 	// Declare a variable of CreateUserRequest struct type
 	var userReq CreateUserRequest
+
+	userReq.OrgID = pathVars["org_id"]
 	// Decode and "cast" the values of the request body to the variable declared above
 	err := json.NewDecoder(req.Body).Decode(&userReq)
 	if err != nil {
@@ -113,6 +131,10 @@ func DecodeGetUserReq(ctx context.Context, req *http.Request) (interface{}, erro
 
 func DecodeLoginReq(ctx context.Context, req *http.Request) (interface{}, error) {
 	var loginReq LoginRequest
+
+	pathVars := mux.Vars(req)
+
+	loginReq.OrgID = pathVars["org_id"]
 	// Decode and "cast" the values of the request body to the variable declared above
 	err := json.NewDecoder(req.Body).Decode(&loginReq)
 	if err != nil {
@@ -134,4 +156,15 @@ func DecodeUpdateUserProfileReq(ctx context.Context, req *http.Request) (interfa
 	updatesReq.AccountID = pathVars["id"]
 
 	return updatesReq, nil
+}
+
+func DecodeCreateOrgReq(ctx context.Context, req *http.Request) (interface{}, error) {
+	var orgReq CreateOrgRequest
+
+	err := json.NewDecoder(req.Body).Decode(&orgReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return orgReq, nil
 }
