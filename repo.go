@@ -1,4 +1,4 @@
-package account
+package accountsrv
 
 import (
 	"context"
@@ -27,6 +27,7 @@ type Repository interface {
 
 	CreateOrgAccount(ctx context.Context, orgAccount OrgAccount) error
 	CreateOrgProfile(ctx context.Context, orgProfile OrgProfile) error
+	GetOrgAccount(ctx context.Context, id string) (OrgAccount, error)
 	DeleteOrgAccount(ctx context.Context, id string) error
 
 	AssociateUserToOrg(ctx context.Context, userID string, orgID string) error
@@ -201,6 +202,22 @@ func (repo *repo) CreateOrgProfile(ctx context.Context, orgProfile OrgProfile) e
 	return nil
 }
 
+func (repo *repo) GetOrgAccount(ctx context.Context, id string) (OrgAccount, error) {
+
+	var account OrgAccount
+
+	sqlCmd := `SELECT (id, name, type, joined_on) FROM org_accounts WHERE id = $1`
+
+	err := repo.db.QueryRowContext(ctx, sqlCmd,
+		id).Scan(&account.ID, &account.Name, &account.Type, &account.JoinedOn)
+
+	if err != nil {
+		return account, errors.New("could not find organization account")
+	}
+
+	return account, nil
+}
+
 func (repo *repo) DeleteOrgAccount(ctx context.Context, id string) error {
 	sqlCmd := `DELETE FROM org_accounts WHERE id=$1`
 
@@ -262,7 +279,6 @@ func genUpdateLine(k string, v interface{}) string {
 		if v == "DEFAULT" {
 			update += t
 		} else {
-			// update += fmt.Sprintf("%q", t)
 			update += "'" + t + "'"
 		}
 	case nil:

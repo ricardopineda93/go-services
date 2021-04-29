@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rjjp5294/gokit-tutorial/account"
+	"github.com/rjjp5294/accountsrv"
 )
 
 /*According to Go-Kit docs, the main func should be a bit hefty since it is meant
@@ -85,16 +85,16 @@ func main() {
 	ctx := context.Background()
 
 	// Define a variable for the account service
-	var accountService account.Service
+	var accountService accountsrv.Service
 	// Below are perfect examples of clean dependency injection in a centrally scoped place
 	// using factory funcs
 	{
 		// Initialize Repository interface && underlying struct using the NewRepo factory func
-		repository := account.NewRepo(db, logger)
+		repository := accountsrv.NewRepo(db, logger)
 
 		// Initialize the account service using the factory func, passing in the repository
 		// instance we just created along with the logger we defined above.
-		accountService = account.NewService(repository, logger)
+		accountService = accountsrv.NewService(repository, logger)
 	}
 
 	// Create a channel for errors
@@ -102,14 +102,14 @@ func main() {
 
 	// Again, using a factory function to create the Endpoints and passing in the
 	// service we initialized about as a dependency and central scope control
-	endpoints := account.MakeEndpoints(accountService)
+	endpoints := accountsrv.MakeEndpoints(accountService)
 
 	// Spin up the server in a goroutine
 	go func() {
 		fmt.Println("listening on port", *httpAddr)
 		// Initialize a server instance using the Background Context and Endpoints we
 		// defined above, injecting the dependencies directly
-		handler := account.NewHTTPServer(ctx, endpoints)
+		handler := accountsrv.NewHTTPServer(ctx, endpoints)
 		// Start the server, pipe errors (if any) resulting from this into the errs channel
 		errs <- http.ListenAndServe(*httpAddr, handler)
 	}()

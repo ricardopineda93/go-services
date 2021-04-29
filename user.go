@@ -1,4 +1,4 @@
-package account
+package accountsrv
 
 type UserAccount struct {
 	ID       string `db:"id"`

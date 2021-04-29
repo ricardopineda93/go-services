@@ -1,4 +1,4 @@
-package account
+package accountsrv
 
 type OrgAccount struct {
 	ID       string `db:"id"`
@@ -26,7 +26,7 @@ type PayorDetails struct {
 	PayorID   string `db:"payor_id"`
 }
 
-type DetailedOrg struct {
+type OrgDetails struct {
 	Account         OrgAccount
 	Profile         OrgProfile
 	ProviderDetails ProviderDetails

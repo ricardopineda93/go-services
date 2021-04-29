@@ -1,4 +1,4 @@
-package account
+package accountsrv
 
 import (
 	"context"
@@ -87,7 +87,6 @@ func (s service) CreateUser(ctx context.Context, orgID string, username string, 
 		return "", err
 	}
 
-	// TODO: Create Association of User and Organization
 	if err := s.repository.AssociateUserToOrg(ctx, id, orgID); err != nil {
 		s.repository.DeleteUserAccount(ctx, id)
 		level.Error(logger).Log("err", err)
