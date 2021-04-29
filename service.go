@@ -163,8 +163,8 @@ func (s service) Login(ctx context.Context, orgID string, username string, passw
 	logger.Log("Login user", account.ID)
 
 	return DetailedUser{
-		Account: account,
-		Profile: profile,
+		UserAccount: account,
+		UserProfile: profile,
 	}, nil
 }
 

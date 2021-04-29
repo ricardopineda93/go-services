@@ -140,11 +140,10 @@ func (repo *repo) UpdateUserProfile(ctx context.Context, accountID string, updat
 // Repository interface to use
 func (repo *repo) GetUserAccount(ctx context.Context, id string) (UserAccount, error) {
 	var account UserAccount
-	err := repo.db.QueryRow(`
-	SELECT acct.id, acct.username, acct.joined_on
-	FROM user_accounts AS acct
-	WHERE id=$1`,
-		id).Scan(&account.ID, &account.Username, &account.JoinedOn)
+
+	sqlCmd := `SELECT id, username, org_type ,joined_on FROM user_accounts WHERE id=$1`
+
+	err := repo.db.QueryRow(sqlCmd, id).Scan(&account.ID, &account.Username, &account.OrgType, &account.JoinedOn)
 	if err != nil {
 		fmt.Println(err)
 		return account, errors.New("no user found")

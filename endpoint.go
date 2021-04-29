@@ -42,10 +42,7 @@ func makeCreateUserEndpoint(s Service) endpoint.Endpoint {
 		// TODO: Have some validation somewhere that can prevent us from wasting effort
 		// if the request isn't going to be valid.
 		id, err := s.CreateUser(ctx, req.OrgID, req.Username, req.Password, req.OrgType, req.FirstName, req.LastName, req.Email, req.Phone)
-		if err != nil {
-			return nil, err
-		}
-		return CreateUserResponse{ID: id}, err // Return a response in the shape we specified in this struct
+		return CreateUserResponse{ID: id, Err: err}, nil // Return a response in the shape we specified in this struct
 	}
 }
 
@@ -53,7 +50,7 @@ func makeGetUserAccountEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(GetUserRequest)
 		account, err := s.GetUserAccount(ctx, req.ID)
-		return GetUserAccountResponse{ID: account.ID, Username: account.Username, JoinedOn: account.JoinedOn}, err
+		return GetUserAccountResponse{UserAccount: account, Err: err}, nil
 	}
 }
 
@@ -63,20 +60,11 @@ func makeLoginUserEndpoint(s Service) endpoint.Endpoint {
 
 		detailedUser, err := s.Login(ctx, req.OrgID, req.Username, req.Password)
 
-		account, profile := &detailedUser.Account, &detailedUser.Profile
-
 		return LoginResponse{
-			UserAccount: LoginUserAccount{
-				ID:       account.ID,
-				Username: account.Username,
-			},
-			UserProfile: LoginUserProfile{
-				FirstName: profile.FirstName,
-				LastName:  profile.LastName,
-				Email:     profile.Email,
-				Phone:     profile.Phone,
-			},
-		}, err
+			UserAccount: detailedUser.UserAccount,
+			UserProfile: detailedUser.UserProfile,
+			Err:         err,
+		}, nil
 
 	}
 }
@@ -90,11 +78,7 @@ func makeUpdateUserProfileEndpoint(s Service) endpoint.Endpoint {
 
 		err := s.UpdateUserProfile(ctx, req.AccountID, updatesMap)
 
-		if err != nil {
-			return nil, err
-		}
-
-		return UpdateProfileResponse{OK: "ok"}, nil
+		return UpdateProfileResponse{OK: "ok", Err: err}, nil
 	}
 }
 
@@ -104,10 +88,6 @@ func makeCreateOrgEndpoint(s Service) endpoint.Endpoint {
 
 		id, err := s.CreateOrg(ctx, req.Name, req.Type, req.Phone, req.Address, req.Timezone, req.Website)
 
-		if err != nil {
-			return nil, err
-		}
-
-		return CreateOrgResponse{ID: id}, nil
+		return CreateOrgResponse{ID: id, Err: err}, nil
 	}
 }

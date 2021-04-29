@@ -74,13 +74,31 @@ func NewHTTPServer(ctx context.Context, endpoints Endpoints) http.Handler {
 
 func commonMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(respWriter http.ResponseWriter, req *http.Request) {
-		respWriter.Header().Add("Content-Type", "application/json")
+		respWriter.Header().Add("Content-Type", "application/json; charset=utf-8")
 		next.ServeHTTP(respWriter, req)
 	})
 }
 
-// This function is responsible for encoding the Response body into JSON
+// errorer is implemented by all concrete response types that may contain
+// errors. It allows us to change the HTTP response code without needing to
+// trigger an endpoint (transport-level) error
+type Errorer interface {
+	error() error
+}
+
+// This function is responsible for encoding the Response body into JSON. It can
+// detect whether there is a business logic error returned from the service method
+// being invoked and treat as an appropriate HTTP error rather than it being
+// treated as a Transport-Layer error
 func EncodeResponse(ctx context.Context, respWriter http.ResponseWriter, response interface{}) error {
+	//
+	if e, ok := response.(Errorer); ok && e.error() != nil {
+		// Not a Go kit transport error, but a business-logic error.
+		// Provide those as HTTP errors.
+		EncodeError(ctx, e.error(), respWriter)
+		return nil
+	}
+	respWriter.Header().Set("Content-Type", "application/json; charset=utf-8")
 	return json.NewEncoder(respWriter).Encode(response)
 }
 
@@ -163,4 +181,27 @@ func DecodeCreateOrgReq(ctx context.Context, req *http.Request) (interface{}, er
 	}
 
 	return orgReq, nil
+}
+
+func EncodeError(_ context.Context, err error, w http.ResponseWriter) {
+	if err == nil {
+		panic("encodeError with nil error")
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(CodeFrom(err))
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": err.Error(),
+	})
+}
+
+func CodeFrom(err error) int {
+	switch err {
+	// case ErrNotFound:
+	// 	return http.StatusNotFound
+	// case ErrAlreadyExists, ErrInconsistentIDs:
+	// 	return http.StatusBadRequest
+	default:
+		// return http.StatusInternalServerError
+		return http.StatusBadRequest
+	}
 }
