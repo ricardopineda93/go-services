@@ -1,13 +1,13 @@
 package account
 
-type Account struct {
+type OrgAccount struct {
 	ID       string `db:"id"`
 	Name     string `db:"name"`
 	Type     string `db:"type"`
 	JoinedOn string `db:"joined_on"`
 }
 
-type Profile struct {
+type OrgProfile struct {
 	AccountID string `db:"account_id"`
 	Phone     string `db:"phone"`
 	Address   string `db:"address"`
@@ -27,8 +27,8 @@ type PayorDetails struct {
 }
 
 type DetailedOrg struct {
-	Account         Account
-	Profile         Profile
+	Account         OrgAccount
+	Profile         OrgProfile
 	ProviderDetails ProviderDetails
 	PayorDetails    PayorDetails
 }

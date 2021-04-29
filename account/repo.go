@@ -7,8 +7,6 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log"
-	o "github.com/rjjp5294/gokit-tutorial/account/organization"
-	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 // A custom error we can pass back in place of the SQL error in the event
@@ -19,16 +17,16 @@ var RepoErr = errors.New("repository error")
 // help us deal with the DB whereas the Service interface is the methods we expose
 // for the service as a whole.
 type Repository interface {
-	CreateUserAccount(ctx context.Context, account u.Account) error
+	CreateUserAccount(ctx context.Context, account UserAccount) error
 	DeleteUserAccount(ctx context.Context, id string) error
-	CreateUserProfile(ctx context.Context, profile u.Profile) error
-	GetUserProfile(ctx context.Context, accountID string) (u.Profile, error)
+	CreateUserProfile(ctx context.Context, profile UserProfile) error
+	GetUserProfile(ctx context.Context, accountID string) (UserProfile, error)
 	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
-	GetUserAccount(ctx context.Context, id string) (u.Account, error)
-	GetAccountByLoginCredentials(ctx context.Context, username string, password string) (u.Account, error)
+	GetUserAccount(ctx context.Context, id string) (UserAccount, error)
+	GetAccountByLoginCredentials(ctx context.Context, username string, password string) (UserAccount, error)
 
-	CreateOrgAccount(ctx context.Context, orgAccount o.Account) error
-	CreateOrgProfile(ctx context.Context, orgProfile o.Profile) error
+	CreateOrgAccount(ctx context.Context, orgAccount OrgAccount) error
+	CreateOrgProfile(ctx context.Context, orgProfile OrgProfile) error
 	DeleteOrgAccount(ctx context.Context, id string) error
 
 	AssociateUserToOrg(ctx context.Context, userID string, orgID string) error
@@ -59,7 +57,7 @@ func NewRepo(db *sql.DB, logger log.Logger) Repository {
 // Repository interface to use.
 // This is using a pointer receiver type so this method can mutate the parent
 // repo struct directly if it wanted to...
-func (repo *repo) CreateUserAccount(ctx context.Context, account u.Account) error {
+func (repo *repo) CreateUserAccount(ctx context.Context, account UserAccount) error {
 	sqlCmd := `
 		INSERT INTO user_accounts (id, username, password, org_type)
 		VALUES ($1, $2, $3, $4)`
@@ -88,7 +86,7 @@ func (repo *repo) DeleteUserAccount(ctx context.Context, id string) error {
 	return nil
 }
 
-func (repo *repo) CreateUserProfile(ctx context.Context, profile u.Profile) error {
+func (repo *repo) CreateUserProfile(ctx context.Context, profile UserProfile) error {
 	sqlCmd := `
 		INSERT INTO user_profiles (account_id, first_name, last_name, email, phone)
 		VALUES ($1, $2, $3, $4, $5)`
@@ -105,8 +103,8 @@ func (repo *repo) CreateUserProfile(ctx context.Context, profile u.Profile) erro
 	return nil
 }
 
-func (repo *repo) GetUserProfile(ctx context.Context, accountID string) (u.Profile, error) {
-	var profile u.Profile
+func (repo *repo) GetUserProfile(ctx context.Context, accountID string) (UserProfile, error) {
+	var profile UserProfile
 
 	err := repo.db.QueryRowContext(ctx,
 		`SELECT first_name, last_name, email, phone, last_login
@@ -139,8 +137,8 @@ func (repo *repo) UpdateUserProfile(ctx context.Context, accountID string, updat
 
 // Defining the method that will handle finding a user in the DB for the
 // Repository interface to use
-func (repo *repo) GetUserAccount(ctx context.Context, id string) (u.Account, error) {
-	var account u.Account
+func (repo *repo) GetUserAccount(ctx context.Context, id string) (UserAccount, error) {
+	var account UserAccount
 	err := repo.db.QueryRow(`
 	SELECT acct.id, acct.username, acct.joined_on
 	FROM user_accounts AS acct
@@ -153,8 +151,8 @@ func (repo *repo) GetUserAccount(ctx context.Context, id string) (u.Account, err
 	return account, nil
 }
 
-func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username string, password string) (u.Account, error) {
-	var account u.Account
+func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username string, password string) (UserAccount, error) {
+	var account UserAccount
 
 	// First find user account by username
 	err := repo.db.QueryRowContext(ctx,
@@ -166,17 +164,17 @@ func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username str
 	// Check to see if the user account's password matches input password
 	if err != nil {
 		fmt.Println(err)
-		return u.Account{}, errors.New("invalid credentials")
+		return UserAccount{}, errors.New("invalid credentials")
 	}
 
 	if password != account.Password {
-		return u.Account{}, errors.New("incorrect password")
+		return UserAccount{}, errors.New("incorrect password")
 	}
 
 	return account, nil
 }
 
-func (repo *repo) CreateOrgAccount(ctx context.Context, orgAccount o.Account) error {
+func (repo *repo) CreateOrgAccount(ctx context.Context, orgAccount OrgAccount) error {
 	sqlCmd := `
 		INSERT INTO org_accounts (id, name, type)
 		VALUES ($1, $2, $3)`
@@ -189,7 +187,7 @@ func (repo *repo) CreateOrgAccount(ctx context.Context, orgAccount o.Account) er
 	return nil
 }
 
-func (repo *repo) CreateOrgProfile(ctx context.Context, orgProfile o.Profile) error {
+func (repo *repo) CreateOrgProfile(ctx context.Context, orgProfile OrgProfile) error {
 	sqlCmd := `
 	INSERT INTO org_profiles (account_id, address, phone, timezone, website)
 	VALUES ($1, $2, $3, $4, $5)`

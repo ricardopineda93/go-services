@@ -1,6 +1,6 @@
 package account
 
-type Account struct {
+type UserAccount struct {
 	ID       string `db:"id"`
 	Username string `db:"username"`
 	Password string `db:"password"`
@@ -8,7 +8,7 @@ type Account struct {
 	OrgType  string `db:"org_type"`
 }
 
-type Profile struct {
+type UserProfile struct {
 	AccountID string `db:"account_id"`
 	FirstName string `db:"first_name"`
 	LastName  string `db:"last_name"`
@@ -18,6 +18,6 @@ type Profile struct {
 }
 
 type DetailedUser struct {
-	Account Account
-	Profile Profile
+	Account UserAccount
+	Profile UserProfile
 }

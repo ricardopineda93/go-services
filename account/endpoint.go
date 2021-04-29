@@ -116,9 +116,13 @@ func makeCreateOrgEndpoint(s Service) endpoint.Endpoint {
 	}
 }
 
+// Function takes in a Struct and returns a Map of that struct using the tags associated
+// to the struct fields to create the keys of the Map
 func structToMapByTag(item interface{}, tagName string) map[string]interface{} {
 
+	// Declare the map that will be returned
 	res := map[string]interface{}{}
+	// If input item is null return the map
 	if item == nil {
 		return res
 	}

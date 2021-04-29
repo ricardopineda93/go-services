@@ -6,8 +6,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gofrs/uuid"
-	o "github.com/rjjp5294/gokit-tutorial/account/organization"
-	u "github.com/rjjp5294/gokit-tutorial/account/user"
 )
 
 // Service interface exposes what methods are available for the service to the Endpoint Layer.
@@ -19,8 +17,8 @@ type Service interface {
 	CreateUser(ctx context.Context, orgID string, username string, password string, orgType string, firstName string, lastName string, email string, phone string) (string, error)
 	DeleteUserAccount(ctx context.Context, id string) error
 	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
-	GetUserAccount(ctx context.Context, id string) (u.Account, error)
-	Login(ctx context.Context, orgID string, username string, password string) (u.DetailedUser, error)
+	GetUserAccount(ctx context.Context, id string) (UserAccount, error)
+	Login(ctx context.Context, orgID string, username string, password string) (DetailedUser, error)
 
 	CreateOrg(ctx context.Context, name string, orgType string, phone string, address string, timezone string, website string) (string, error)
 }
@@ -60,7 +58,7 @@ func (s service) CreateUser(ctx context.Context, orgID string, username string, 
 
 	uuid, _ := uuid.NewV4()
 	id := uuid.String()
-	user := u.Account{
+	user := UserAccount{
 		ID:       id,
 		Username: username,
 		Password: password,
@@ -75,7 +73,7 @@ func (s service) CreateUser(ctx context.Context, orgID string, username string, 
 		return "", err
 	}
 
-	profile := u.Profile{
+	profile := UserProfile{
 		AccountID: id,
 		FirstName: firstName,
 		LastName:  lastName,
@@ -118,7 +116,7 @@ func (s service) DeleteUserAccount(ctx context.Context, id string) error {
 }
 
 // Method for service struct for the Service interface to implement
-func (s service) GetUserAccount(ctx context.Context, id string) (u.Account, error) {
+func (s service) GetUserAccount(ctx context.Context, id string) (UserAccount, error) {
 	logger := log.With(s.logger, "method", "GetUser")
 
 	// Same thing here, using the repository property's methods to actually do the
@@ -135,37 +133,37 @@ func (s service) GetUserAccount(ctx context.Context, id string) (u.Account, erro
 	return account, nil
 }
 
-func (s service) Login(ctx context.Context, orgID string, username string, password string) (u.DetailedUser, error) {
+func (s service) Login(ctx context.Context, orgID string, username string, password string) (DetailedUser, error) {
 	logger := log.With(s.logger, "method", "Login")
 
 	account, err := s.repository.GetAccountByLoginCredentials(ctx, username, password)
 
 	if err != nil {
 		level.Error(logger).Log("err", err)
-		return u.DetailedUser{}, err
+		return DetailedUser{}, err
 	}
 
 	if err := s.repository.ConfirmUserToOrgAssociation(ctx, account.ID, orgID); err != nil {
 		level.Error(logger).Log("err", err)
-		return u.DetailedUser{}, err
+		return DetailedUser{}, err
 	}
 
 	if err := s.repository.UpdateUserProfile(ctx, account.ID, map[string]interface{}{
 		"last_login": "DEFAULT",
 	}); err != nil {
 		level.Error(logger).Log("err", err)
-		return u.DetailedUser{}, err
+		return DetailedUser{}, err
 	}
 
 	profile, err := s.repository.GetUserProfile(ctx, account.ID)
 	if err != nil {
 		level.Error(logger).Log("err", err)
-		return u.DetailedUser{}, err
+		return DetailedUser{}, err
 	}
 
 	logger.Log("Login user", account.ID)
 
-	return u.DetailedUser{
+	return DetailedUser{
 		Account: account,
 		Profile: profile,
 	}, nil
@@ -191,7 +189,7 @@ func (s service) CreateOrg(ctx context.Context, name string, orgType string, pho
 	uuid, _ := uuid.NewV4()
 	id := uuid.String()
 
-	orgAccount := o.Account{
+	orgAccount := OrgAccount{
 		ID:   id,
 		Name: name,
 		Type: orgType,
@@ -203,7 +201,7 @@ func (s service) CreateOrg(ctx context.Context, name string, orgType string, pho
 		return "", err
 	}
 
-	orgProfile := o.Profile{
+	orgProfile := OrgProfile{
 		AccountID: id,
 		Phone:     phone,
 		Address:   address,
