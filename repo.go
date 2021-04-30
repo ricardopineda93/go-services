@@ -156,10 +156,10 @@ func (repo *repo) GetAccountByLoginCredentials(ctx context.Context, username str
 
 	// First find user account by username
 	err := repo.db.QueryRowContext(ctx,
-		`SELECT id, username, password,joined_on
+		`SELECT id, username, password, org_type, joined_on
 	FROM user_accounts
 	WHERE username=$1`,
-		username).Scan(&account.ID, &account.Username, &account.Password, &account.JoinedOn)
+		username).Scan(&account.ID, &account.Username, &account.Password, &account.OrgType, &account.JoinedOn)
 
 	// Check to see if the user account's password matches input password
 	if err != nil {

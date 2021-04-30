@@ -4,8 +4,8 @@ type UserAccount struct {
 	ID       string `db:"id" json:"id"`
 	Username string `db:"username" json:"username"`
 	Password string `db:"password" json:"password,omitempty"`
-	JoinedOn string `db:"joined_on" json:"joined_on"`
 	OrgType  string `db:"org_type" json:"org_type"`
+	JoinedOn string `db:"joined_on" json:"joined_on"`
 }
 
 type UserProfile struct {
