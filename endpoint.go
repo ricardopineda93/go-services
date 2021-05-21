@@ -58,12 +58,11 @@ func makeLoginUserEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(LoginRequest)
 
-		detailedUser, err := s.Login(ctx, req.OrgID, req.Username, req.Password)
+		loginDetails, err := s.Login(ctx, req.OrgID, req.Username, req.Password)
 
 		return LoginResponse{
-			UserAccount: detailedUser.UserAccount,
-			UserProfile: detailedUser.UserProfile,
-			Err:         err,
+			LoginDetails: loginDetails,
+			Err:          err,
 		}, nil
 
 	}

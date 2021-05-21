@@ -18,6 +18,11 @@ type UserProfile struct {
 }
 
 type DetailedUser struct {
-	UserAccount UserAccount
-	UserProfile UserProfile
+	Account UserAccount `json:"account"`
+	Profile UserProfile `json:"profile"`
+}
+
+type LoginUser struct {
+	User DetailedUser `json:"user"`
+	Org  DetailedOrg  `json:"org"`
 }

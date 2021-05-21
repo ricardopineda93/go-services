@@ -35,10 +35,8 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 type LoginResponse struct {
-	UserAccount UserAccount `json:"user_account,omitempty"`
-	UserProfile UserProfile `json:"user_profile,omitempty"`
-	OrgAccount  OrgAccount  `json:"org_account,omitempty"`
-	Err         error       `json:"error,omitempty"`
+	LoginDetails LoginUser `json:"login_details"`
+	Err          error     `json:"error,omitempty"`
 }
 
 func (r LoginResponse) error() error { return r.Err }

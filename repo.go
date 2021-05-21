@@ -28,6 +28,7 @@ type Repository interface {
 	CreateOrgAccount(ctx context.Context, orgAccount OrgAccount) error
 	CreateOrgProfile(ctx context.Context, orgProfile OrgProfile) error
 	GetOrgAccount(ctx context.Context, id string) (OrgAccount, error)
+	GetOrgProfile(ctx context.Context, accountID string) (OrgProfile, error)
 	DeleteOrgAccount(ctx context.Context, id string) error
 
 	AssociateUserToOrg(ctx context.Context, userID string, orgID string) error
@@ -205,7 +206,7 @@ func (repo *repo) GetOrgAccount(ctx context.Context, id string) (OrgAccount, err
 
 	var account OrgAccount
 
-	sqlCmd := `SELECT (id, name, type, joined_on) FROM org_accounts WHERE id = $1`
+	sqlCmd := `SELECT id, name, type, joined_on FROM org_accounts WHERE id = $1`
 
 	err := repo.db.QueryRowContext(ctx, sqlCmd,
 		id).Scan(&account.ID, &account.Name, &account.Type, &account.JoinedOn)
@@ -215,6 +216,21 @@ func (repo *repo) GetOrgAccount(ctx context.Context, id string) (OrgAccount, err
 	}
 
 	return account, nil
+}
+
+func (repo *repo) GetOrgProfile(ctx context.Context, accountID string) (OrgProfile, error) {
+
+	var profile OrgProfile
+
+	sqlCmd := `SELECT account_id, address, phone, timezone, website FROM org_profiles WHERE account_id = $1`
+
+	err := repo.db.QueryRowContext(ctx, sqlCmd, accountID).Scan(&profile.AccountID, &profile.Address, &profile.Phone, &profile.Timezone, &profile.Website)
+
+	if err != nil {
+		return profile, errors.New("could not find organization profile")
+	}
+
+	return profile, nil
 }
 
 func (repo *repo) DeleteOrgAccount(ctx context.Context, id string) error {

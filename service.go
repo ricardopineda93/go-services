@@ -18,7 +18,7 @@ type Service interface {
 	DeleteUserAccount(ctx context.Context, id string) error
 	UpdateUserProfile(ctx context.Context, accountID string, updates map[string]interface{}) error
 	GetUserAccount(ctx context.Context, id string) (UserAccount, error)
-	Login(ctx context.Context, orgID string, username string, password string) (DetailedUser, error)
+	Login(ctx context.Context, orgID string, username string, password string) (LoginUser, error)
 
 	CreateOrg(ctx context.Context, name string, orgType string, phone string, address string, timezone string, website string) (string, error)
 }
@@ -132,39 +132,64 @@ func (s service) GetUserAccount(ctx context.Context, id string) (UserAccount, er
 	return account, nil
 }
 
-func (s service) Login(ctx context.Context, orgID string, username string, password string) (DetailedUser, error) {
+func (s service) Login(ctx context.Context, orgID string, username string, password string) (LoginUser, error) {
 	logger := log.With(s.logger, "method", "Login")
 
+	// TODO: check if org even exists first... ??
+
+	// Get the user account by their username and password
 	account, err := s.repository.GetAccountByLoginCredentials(ctx, username, password)
 
 	if err != nil {
 		level.Error(logger).Log("err", err)
-		return DetailedUser{}, err
+		return LoginUser{}, err
 	}
 
 	if err := s.repository.ConfirmUserToOrgAssociation(ctx, account.ID, orgID); err != nil {
 		level.Error(logger).Log("err", err)
-		return DetailedUser{}, err
+		return LoginUser{}, err
 	}
 
 	if err := s.repository.UpdateUserProfile(ctx, account.ID, map[string]interface{}{
 		"last_login": "DEFAULT",
 	}); err != nil {
 		level.Error(logger).Log("err", err)
-		return DetailedUser{}, err
+		return LoginUser{}, err
 	}
 
 	profile, err := s.repository.GetUserProfile(ctx, account.ID)
 	if err != nil {
 		level.Error(logger).Log("err", err)
-		return DetailedUser{}, err
+		return LoginUser{}, err
+	}
+
+	orgAccount, err := s.repository.GetOrgAccount(ctx, orgID)
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return LoginUser{}, err
+	}
+
+	orgProfile, err := s.repository.GetOrgProfile(ctx, orgID)
+	if err != nil {
+		level.Error(logger).Log("err", err)
+		return LoginUser{}, err
 	}
 
 	logger.Log("Login user", account.ID)
 
-	return DetailedUser{
-		UserAccount: account,
-		UserProfile: profile,
+	detailedUser := DetailedUser{
+		Account: account,
+		Profile: profile,
+	}
+
+	detailedOrg := DetailedOrg{
+		Account: orgAccount,
+		Profile: orgProfile,
+	}
+
+	return LoginUser{
+		detailedUser,
+		detailedOrg,
 	}, nil
 }
 
